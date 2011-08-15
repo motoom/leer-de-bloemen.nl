@@ -9,18 +9,14 @@
 # - show high score ranking.
 # - feedback form when complete: which were the flowers you had most problems with?.
 # - meticulous logging (or analysis of logs afterwards) so we can see how people play the quiz.
-# - decorator om state automatisch te persisteren van/naar session object?
-
-# TODO: Engelse namen+weetjes van de bestaande voorbeeldbloemen.
-# Als moeilijk vindbaar is in NL/EN Wikipedia -> Overslaan
-# Als geen goeie bloem-achtige plant is -> Overslaan
-# Alleen CC-BY-SA en PD licensie typen gebruiken.
+# - decorator om state automatisch te persisteren van/naar session object
 
 import sys
 import cherrypy
 from cherrypy import expose, engine
 import random
 import time
+import socket
 import ovotemplate
 import itembankdb
 
@@ -37,6 +33,7 @@ def clamp(value, lower, upper):
     return value
 
 
+# For multiple choice nomenclature, see http://en.wikipedia.org/wiki/Multiple_choice
 class Item(object):
     def __repr__(self):
         return "%s: %s (%d correct in a row, %d correct total, %d incorrect total)" % (self.prompt, self.answer, self.correctrow, self.correct, self.incorrect)
@@ -46,12 +43,15 @@ class Mchoice(object):
     def __init__(self):
         self.tem_site = ovotemplate.Ovotemplate(unicode(open("site.tpl").read(), "utf-8"))
         # Check whether itembank contains non-ascii characters.
+        # Such characters should be specified as HTML entities.
         for _, itembank, _, _ in itembankdb.itembanks:
             for _, _, answer, hint, attribution, license in itembank:
                 answer.encode("ascii")
                 hint.encode("ascii")
                 attribution.encode("ascii")
+                # And also check the licensing of the pictures, Creative Commons or Public Domain.
                 if license not in ("cc", "pd"): raise Exception("%s: license type must be 'cc' or 'pd'" % answer)
+
 
     def populatesession(self, difficulty=0):
         itembankname, itembank, _, _ = itembankdb.itembanks[difficulty]
@@ -64,6 +64,7 @@ class Mchoice(object):
         done = False
         cherrypy.session["items"] = difficulty, learning, learned, tolearn, options, key, rightone, done, tickets
 
+
     def addtolearn(self, tolearn, tolearnsize, learning):
         while len(learning) < tolearnsize and tolearn:
             item = Item()
@@ -71,8 +72,10 @@ class Mchoice(object):
             item.correctrow = item.correct = item.incorrect = 0
             learning.append(item)
 
+
     def generateticket(self):
         return "%f" % time.time()
+
 
     @expose
     def reset(self, *args, **kwargs):
@@ -80,12 +83,16 @@ class Mchoice(object):
         self.populatesession(difficulty)
         raise cherrypy.InternalRedirect('/')
 
+
     def randomgood(self):
         return random.choice(("Goed!", "Ja!", "Inderdaad!", "Correct!"))
+
 
     def randomfout(self):
         return random.choice(("Nee", "Helaas", "Jammer", "Sorry"))
 
+
+    # Waaaah! Reduce the size of this routine. It's too long.
     @expose
     def index(self, *args, **kwargs):
         # Is there an answer specified on the URL? If so, what is it? (None, 0, 1, ... alternatives-1)
@@ -108,12 +115,12 @@ class Mchoice(object):
         wascorrect = False
         ticket = kwargs.get("t")
         if not ticket in tickets: # Protect against resubmits with same parameters.
-            tickets.add(ticket)
+            tickets.add(ticket) # TODO: Protect against DoS, empty tickets when there are 20.000 in there (or some other high improbable number)
 
-            # If an answer is given, check if it's correct.
+            # If an answer is given, check whether it's correct.
             if answer is None or key is None:
                 if not len(learned):
-                    # encouraging starting message only at start of game
+                    # Show an encouraging starting message at start of game:
                     message = itembankdb.itembanks[difficulty][2] # [2] is the item bank intro text
             elif answer == rightone:
                 wascorrect = True
@@ -121,17 +128,17 @@ class Mchoice(object):
                 key.correctrow += 1
                 correctanswer =  key.answer.lower()
                 # TODO: 'good'-template
-                message = "<h2 class=\"yes\">%s</h2><p><img class=\"blackshadow\" src=\"pictures/%s/%s\"></p><p>Dit is %s %s</p>" % (self.randomgood(), langcode, key.prompt, key.pronoun, correctanswer)
+                message = "<h2 class=\"yes\">%s</h2><p><img class=\"blackshadow\" src=\"pictures/%s/%s\"></p><p>Dit is %s %s.</p>" % (self.randomgood(), langcode, key.prompt, key.pronoun, correctanswer)
                 # See if the key has been sufficiently correctly answered; if so, remove it from the items to learn, add it to the learned items, and add a fresh key to the items to learn.
                 if key.correctrow >= threshold:
-                    message += "<p>Je kent deze bloem nu</p>"
+                    message += "<p>Je kent deze bloem nu.</p>"
                     learned.append(key)
                     learning.remove(key)
                     if len(learning) <= lowatermark:
                         self.addtolearn(tolearn, tolearnsize, learning)
                     if not len(learning):
                         # The user knows all the itembank now.
-                        # IDEA: Review the items just learned, sorted on the most errors made.
+                        # TODO: Review the items just learned, sorted on the most errors made.
                         done = True
                         message = ""
             else:
@@ -140,7 +147,7 @@ class Mchoice(object):
                 wronganswer = options[answer].answer.lower()
                 correctanswer =  key.answer.lower()
                 # TODO: 'wrong'-template
-                message = "<h2 class=\"no\">%s</h2><p>Dat was geen %s.</p><p><img class=\"blackshadow\" src=\"pictures/%s/%s\"></p><p>Dit is %s %s</p>" % (self.randomfout(), wronganswer, langcode, key.prompt, key.pronoun, correctanswer)
+                message = "<h2 class=\"no\">%s</h2><p>Dat was geen %s.</p><p><img class=\"blackshadow\" src=\"pictures/%s/%s\"></p><p>Dit is %s %s!</p>" % (self.randomfout(), wronganswer, langcode, key.prompt, key.pronoun, correctanswer)
 
         # Calculate progress
         completed = len(learned)
@@ -166,9 +173,9 @@ class Mchoice(object):
                     </div>
                     """ % (percent, percent)
             else:
-                progress = "Gefeliciteerd, je kent ze allemaal!"
+                progress = "<p>Gefeliciteerd, je kent ze allemaal!</p>"
 
-        # Show which flower character?
+        # Show narrator picture in which mood? -4 = angry, 0 = neutral, 4 = happy (and values in-between).
         feedbackmood=0
         if key and 0 < percent < 100:
             if wascorrect:
@@ -219,7 +226,7 @@ class Mchoice(object):
             while True:
                 safety += 1
                 if safety > 200:
-                    raise Exception("<p>BUG: Safety tripped! Consult log.</p>")
+                    raise Exception("<p>Logic bug, this should never occur. Please inform motoom@xs4all.nl</p>")
                 rightone = random.randint(0, alternatives-1) # Appoint a random item.
                 candidatekey = options[rightone]
                 if candidatekey in learned: continue # If the item is already learned, select an other.
@@ -246,7 +253,7 @@ class Mchoice(object):
             feedback = True
         feedbackpicture = "img/feedback%d.gif" % feedbackmood
         promptpicture = "pictures/%s/%s" % (langcode, key.prompt)
-        
+
         # License
         license = ""
         if key.license == "pd":
@@ -277,7 +284,7 @@ class Mchoice(object):
 
 
     # A list of all flowers, grouped by item bank, name hidden.
-    # show the name with jQuery when user clicks/hover on it!
+    # TODO: Show the name with jQuery when user clicks/hover on it!
     @cherrypy.expose
     def showallwithout(self):
         s = "<a href=\"/\">naar Quiz</a>"
@@ -292,11 +299,18 @@ class Mchoice(object):
         return s
 
 
-# Choose a config file depending on platform (OSX, Windows, Unix, etc)
+# Choose a config file depending on platform (OSX, Windows, Unix, etc) and machine name.
 if "win32" in sys.platform:
     cfg="mchoiceapp-win.conf"
 elif "darwin" in sys.platform:
     cfg="mchoiceapp-osx.conf"
+elif "freebsd" in sys.platform:
+    if "pasta." in socket.gethostname():
+        cfg="mchoiceapp-pasta.conf"
+    elif "rack." in socket.gethostname():
+        cfg="mchoiceapp-rack.conf"
+    else:
+        raise Exception("Unrecognized machine: %s" % socket.gethostname())
 else:
     raise Exception("Unrecognized platform: %s" % sys.platform)
 cherrypy.log("Using configuration file '%s'" % cfg)

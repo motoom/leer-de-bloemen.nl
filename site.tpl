@@ -51,14 +51,16 @@
 </div>
 
 <div id="twitter">
-	<a href="http://twitter.com/share?original_referer=&text=Leer%20de%20bloemen&url=http%3A%2F%2Fleer-de-bloemen.nl" title="Tweet deze site naar je vrienden en vriendinnen!"><img align="right" src="img/twitter.gif"></a>
+	<a href="http://twitter.com/share?original_referer=&text=Leer%20de%20bloemen&url=http%3A%2F%2Fwww.leer-de-bloemen.nl" title="Tweet deze site naar je vrienden en vriendinnen!"><img align="right" src="img/twitter.gif"></a>
 </div>
 
 <div id="grond">
 <p class="bronvermelding">
 {?attribution Foto van bloem: {=attribution}, {=license}.<br />}
-Vormgeving en webprogrammering door <a target="_new" href="http://www.michielovertoom.com">Michiel Overtoom</a>.
-Lees de <a target="_new" href="privacyverklaring">Privacy-verklaring</a></p>
+Vormgeving en webprogrammering door <a target="_new" href="http://www.michielovertoom.com">Michiel Overtoom</a>.<br />
+Jouw <a href="mailto:motoom@xs4all.nl">mening</a> over deze site stel ik zeer op prijs.
+<!-- Lees de <a target="_new" href="privacyverklaring">Privacy-verklaring</a> -->
+</p>
 </div>
 
 </body>
