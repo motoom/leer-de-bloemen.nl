@@ -1,29 +1,34 @@
 # -*- coding: utf-8 -*-
 
-# Software by Michiel Overtoom, motoom@xs4all.nl
+# mchoiceapp.py - Software by Michiel Overtoom, motoom@xs4all.nl
 
-# Ideas:
-# - Extra flowers (madelief, distel, etc...)
+# Ideas/TODOs:
+#
+# - Rotating logfile.
+# - Alles templatiseren, daarna vertalen (en/nl template hierarchy).
 # - English version / internationalisation.
-# - online highscore list, enter your name when you get a high score.
-# - show high score ranking.
-# - feedback form when complete: which were the flowers you had most problems with?.
-# - meticulous logging (or analysis of logs afterwards) so we can see how people play the quiz.
-# - decorator om state automatisch te persisteren van/naar session object
+# - Extra flowers (madelief, distel, etc...).
+# - Online highscore list, enter your name when you get a high score.
+# - Show high score ranking.
+# - Feedback form when complete: which were the flowers you had most problems with?.
+# - Meticulous logging (or analysis of logs afterwards) so we can see how people play the quiz.
+# - Decorator om state automatisch te persisteren van/naar session object.
 
 import sys
+import os
 import cherrypy
-from cherrypy import expose, engine
+from cherrypy import expose
 import random
 import time
 import socket
-import ovotemplate
+from ovotemplate import Ovotemplate
 import itembankdb
+import logging
 
 langcode = 'nl'
 
 threshold = 2 # (3) The number of times the user has to answer an item correctly in a row before it's considered a known item. (suggestion: 3)
-tolearnsize = 7 # (10) Number of items currently being learned
+tolearnsize = 7 # (10) Number of items currently being learned.
 lowatermark = 5 # (5) When the learning has shrunken to 'lowatermark' or less items, refill it from the items to learn.
 alternatives = 4 # (4) Nr. of alternatives to show at each multiple-choice question.
 
@@ -41,7 +46,7 @@ class Item(object):
 
 class Mchoice(object):
     def __init__(self):
-        self.tem_site = ovotemplate.Ovotemplate(unicode(open("site.tpl").read(), "utf-8"))
+        self.tem_site = Ovotemplate().fromfile("site.tpl")
         # Check whether itembank contains non-ascii characters.
         # Such characters should be specified as HTML entities.
         for _, itembank, _, _ in itembankdb.itembanks:
@@ -184,6 +189,9 @@ class Mchoice(object):
                 feedbackmood = clamp(key.correct - key.incorrect, -4, -1)
 
         if done:
+            logmsg = "Level %d completed by %s" % (difficulty, cherrypy.request.remote.ip) # TODO: Also try to keep stats like how long it took, how many good/bad answers, etc.
+            # cherrypy.log(logmsg)
+            cherrypy.log(logmsg, "COMPLETE", logging.INFO)
             url = cherrypy.url("reset")
             urlagain = urlsame = urlnext = urlprev = None
             verdict = itembankdone
@@ -298,27 +306,25 @@ class Mchoice(object):
             s += "</table>\n"
         return s
 
-
-# Choose a config file depending on platform (OSX, Windows, Unix, etc) and machine name.
-if "win32" in sys.platform:
-    cfg="mchoiceapp-win.conf"
-elif "darwin" in sys.platform:
-    cfg="mchoiceapp-osx.conf"
-elif "freebsd" in sys.platform:
-    if "pasta." in socket.gethostname():
-        cfg="mchoiceapp-pasta.conf"
-    elif "rack." in socket.gethostname():
-        cfg="mchoiceapp-rack.conf"
-    else:
-        raise Exception("Unrecognized machine: %s" % socket.gethostname())
-else:
-    raise Exception("Unrecognized platform: %s" % sys.platform)
-cherrypy.log("Using configuration file '%s'" % cfg)
-
-
 # Main program.
 mchoice = Mchoice()
+cfg = socket.gethostname()
+if "." in cfg: cfg = cfg.split(".")[0]
+cfg = os.path.join("cfg", cfg + ".cfg");
+cherrypy.log("Using configuration file '%s'" % cfg, "ENGINE")
 cherrypy.config.update(cfg)
 root = cherrypy.tree.mount(mchoice, "/", cfg)
-cherrypy.engine.autoreload.files.add("site.tpl")
-cherrypy.quickstart(root)
+
+user, group = cherrypy.config.get("server.user"), cherrypy.config.get("server.group")
+dropargs = {}
+if user: dropargs["uid"] = user
+if group: dropargs["gid"] = group
+if dropargs:
+    cherrypy.process.plugins.DropPrivileges(cherrypy.engine, **dropargs).subscribe()
+
+if __name__ == "__main__":
+    cherrypy.engine.autoreload.files.add("site.tpl")
+    cherrypy.quickstart(root)
+else:
+    # Assume we run from cherryd
+    pass

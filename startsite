@@ -1,0 +1,18 @@
+#!/bin/sh
+
+dir="."
+deamonize=""
+
+if [ -e /Users/user/Sites/leer-de-bloemen.nl ]; then
+    dir="/Users/user/Sites/leer-de-bloemen.nl"
+    echo "Running on OSX"
+fi
+
+if [ -e /www/leer-de-bloemen.nl ]; then
+    dir="/www/leer-de-bloemen.nl"
+    deamonize="-d"
+    echo "Running on BSD"
+fi
+
+cd $dir
+sudo cherryd $deamonize -P $dir -p /var/run/leer-de-bloemen.nl.pid -i mchoiceapp

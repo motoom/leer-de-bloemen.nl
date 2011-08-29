@@ -1,0 +1,2 @@
+# sudo pkill -9 "python mchoiceapp.py" # niet speficiek genoeg: wat als er ook een engelse mchoiceapp loopt?
+sudo kill `cat /var/run/leer-de-bloemen.nl.pid`

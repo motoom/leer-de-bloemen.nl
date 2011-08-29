@@ -1,4 +1,6 @@
 
+# itembankdb.py - Software by Michiel Overtoom, motoom@xs4all.nl
+
 easy = (
     ('0006.jpg', 'een', 'Brandnetel', 'Deze plant kun je beter niet aanraken!', 'Frank Vincentz', 'cc'),
     ('0005.jpg', 'een', 'Boterbloem', 'Deze bloem is giftig voor vee, maar aangezien ze helemaal niet lekker zijn, is dat geen probleem.', 'Kurt Stueber', 'cc'),
@@ -96,4 +98,3 @@ itembanks = (
         "<p>Dat was het. Je kent nu alle bloemen die op deze website staan. Fantastisch!</p>",
         ),
     )
-    

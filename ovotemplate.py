@@ -230,13 +230,26 @@ def descendingparse(s, i=0, level=0):
 
 class Ovotemplate(object):
 
-    def __init__(self, s):
-        _, self.root = descendingparse(s)
+    def __init__(self, s=None):
+        if s:
+            _, self.root = descendingparse(s)
+        else:
+            self.root = None
+            
+    def fromfile(self, fn):
+        '''
+        Allows: tem = Ovotemplate().fromfile("hello.tpl")
+        The template file should contain UTF-8 encoded unicode text
+        '''
+        _, self.root = descendingparse(unicode(open(fn,"rb").read(), "utf-8"))
+        return self
 
     def pprint(self):
         pprint.pprint(self.root)
 
     def render(self, vars):
+        if not self.root:
+            raise Exception("You should either pass a template as a string in the constructor, or use 'fromfile' to read the template from file")
         return self.root.render(vars)
 
 
