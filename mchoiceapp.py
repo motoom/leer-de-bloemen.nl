@@ -5,14 +5,14 @@
 # Ideas/TODOs:
 #
 # - Rotating logfile.
-# - Alles templatiseren, daarna vertalen (en/nl template hierarchy).
+# - Templatize everything, translate all strings (en/nl template hierarchy).
 # - English version / internationalisation.
 # - Extra flowers (madelief, distel, etc...).
 # - Online highscore list, enter your name when you get a high score.
-# - Show high score ranking.
+# - Show high score rankings.
 # - Feedback form when complete: which were the flowers you had most problems with?.
 # - Meticulous logging (or analysis of logs afterwards) so we can see how people play the quiz.
-# - Decorator om state automatisch te persisteren van/naar session object.
+# - Decorator to automatically persist/restore state to/from session.
 
 import sys
 import os
@@ -22,10 +22,11 @@ import random
 import time
 import socket
 from ovotemplate import Ovotemplate
-import itembankdb
 import logging
+import autoreload
+import imp
+import inspect
 
-langcode = 'nl'
 
 threshold = 2 # (3) The number of times the user has to answer an item correctly in a row before it's considered a known item. (suggestion: 3)
 tolearnsize = 7 # (10) Number of items currently being learned.
@@ -45,8 +46,15 @@ class Item(object):
 
 
 class Mchoice(object):
+
     def __init__(self):
-        self.tem_site = Ovotemplate().fromfile("site.tpl")
+        self.language = cherrypy.config["language"]
+        self.tem_site = self.loadtemplate("site.tpl")
+        self.tem_levelstart = self.loadtemplate("levelstart.tpl")
+        self.tem_correct = self.loadtemplate("correct.tpl")
+        self.tem_wrong = self.loadtemplate("wrong.tpl")
+        self.tem_progress = self.loadtemplate("progress.tpl")
+        self.tem_verdict = self.loadtemplate("verdict.tpl")
         # Check whether itembank contains non-ascii characters.
         # Such characters should be specified as HTML entities.
         for _, itembank, _, _ in itembankdb.itembanks:
@@ -57,6 +65,10 @@ class Mchoice(object):
                 # And also check the licensing of the pictures, Creative Commons or Public Domain.
                 if license not in ("cc", "pd"): raise Exception("%s: license type must be 'cc' or 'pd'" % answer)
 
+
+    def loadtemplate(self, fn):
+        return Ovotemplate().fromfile(os.path.join("templates", self.language, fn)) 
+               
 
     def populatesession(self, difficulty=0):
         itembankname, itembank, _, _ = itembankdb.itembanks[difficulty]
@@ -85,21 +97,23 @@ class Mchoice(object):
     @expose
     def reset(self, *args, **kwargs):
         difficulty = int(kwargs.get("difficulty", 0))
+        difficulty = clamp(difficulty, 0, len(itembankdb.itembanks) - 1)
         self.populatesession(difficulty)
         raise cherrypy.InternalRedirect('/')
 
 
-    def randomgood(self):
-        return random.choice(("Goed!", "Ja!", "Inderdaad!", "Correct!"))
+    def randomcorrect(self):
+        return random.choice(texts.corrects)
 
 
-    def randomfout(self):
-        return random.choice(("Nee", "Helaas", "Jammer", "Sorry"))
+    def randomwrong(self):
+        return random.choice(texts.wrongs)
 
 
     # Waaaah! Reduce the size of this routine. It's too long.
     @expose
     def index(self, *args, **kwargs):
+        
         # Is there an answer specified on the URL? If so, what is it? (None, 0, 1, ... alternatives-1)
         answer = kwargs.get("a")
         if answer is not None:
@@ -120,7 +134,7 @@ class Mchoice(object):
         wascorrect = False
         ticket = kwargs.get("t")
         if not ticket in tickets: # Protect against resubmits with same parameters.
-            tickets.add(ticket) # TODO: Protect against DoS, empty tickets when there are 20.000 in there (or some other high improbable number)
+            tickets.add(ticket) # TODO: Protect against DoS, empty tickets when there are 20.000 in there (or some other high improbable number). Or remove the oldest entries.
 
             # If an answer is given, check whether it's correct.
             if answer is None or key is None:
@@ -132,11 +146,10 @@ class Mchoice(object):
                 key.correct += 1
                 key.correctrow += 1
                 correctanswer =  key.answer.lower()
-                # TODO: 'good'-template
-                message = "<h2 class=\"yes\">%s</h2><p><img class=\"blackshadow\" src=\"pictures/%s/%s\"></p><p>Dit is %s %s.</p>" % (self.randomgood(), langcode, key.prompt, key.pronoun, correctanswer)
                 # See if the key has been sufficiently correctly answered; if so, remove it from the items to learn, add it to the learned items, and add a fresh key to the items to learn.
+                known = False
                 if key.correctrow >= threshold:
-                    message += "<p>Je kent deze bloem nu.</p>"
+                    known = True
                     learned.append(key)
                     learning.remove(key)
                     if len(learning) <= lowatermark:
@@ -146,13 +159,17 @@ class Mchoice(object):
                         # TODO: Review the items just learned, sorted on the most errors made.
                         done = True
                         message = ""
+                if done:
+                    message = ""
+                else:
+                    message = self.tem_correct.render(dict(correct=self.randomcorrect(), language=self.language, prompt=key.prompt, pronoun=key.pronoun, correctanswer=correctanswer, known=known))
+
             else:
                 key.incorrect += 1
                 key.correctrow = 0
                 wronganswer = options[answer].answer.lower()
                 correctanswer =  key.answer.lower()
-                # TODO: 'wrong'-template
-                message = "<h2 class=\"no\">%s</h2><p>Dat was geen %s.</p><p><img class=\"blackshadow\" src=\"pictures/%s/%s\"></p><p>Dit is %s %s!</p>" % (self.randomfout(), wronganswer, langcode, key.prompt, key.pronoun, correctanswer)
+                message = self.tem_wrong.render(dict(wrong=self.randomwrong(), wronganswer=wronganswer, language=self.language, prompt=key.prompt, pronoun=key.pronoun, correctanswer=correctanswer))
 
         # Calculate progress
         completed = len(learned)
@@ -167,18 +184,9 @@ class Mchoice(object):
         progress = ""
         if percent > 0:
             if percent < 100:
-                # TODO: Progress-template.
-                progress = """
-                    <div class="meter-wrap">
-                        <div class="meter-value" style="background-color: #0a0; width: %.0f%%;">
-                            <div class="meter-text">
-                                %.0f%%&nbsp;voltooid
-                            </div>
-                        </div>
-                    </div>
-                    """ % (percent, percent)
+                progress = self.tem_progress.render(dict(percent=str(int(percent))))
             else:
-                progress = "<p>Gefeliciteerd, je kent ze allemaal!</p>"
+                progress = texts.youknowthemall
 
         # Show narrator picture in which mood? -4 = angry, 0 = neutral, 4 = happy (and values in-between).
         feedbackmood=0
@@ -190,11 +198,9 @@ class Mchoice(object):
 
         if done:
             logmsg = "Level %d completed by %s" % (difficulty, cherrypy.request.remote.ip) # TODO: Also try to keep stats like how long it took, how many good/bad answers, etc.
-            # cherrypy.log(logmsg)
             cherrypy.log(logmsg, "COMPLETE", logging.INFO)
             url = cherrypy.url("reset")
             urlagain = urlsame = urlnext = urlprev = None
-            verdict = itembankdone
             if difficulty == 0: # First level.
                 urlsame = cherrypy.url("reset", "difficulty=%d" % (difficulty,))
                 urlnext = cherrypy.url("reset", "difficulty=%d" % (difficulty + 1,))
@@ -205,15 +211,7 @@ class Mchoice(object):
                 urlprev = cherrypy.url("reset", "difficulty=%d" % (difficulty - 1,))
                 urlsame = cherrypy.url("reset", "difficulty=%d" % (difficulty,))
                 urlnext = cherrypy.url("reset", "difficulty=%d" % (difficulty + 1,))
-            # TODO: 'done'-subtemplate.
-            if urlnext:
-                verdict += "<p class=\"next shadow rounded\"><a href=\"%s\">Ga verder <img src=\"img/arrow-forward.png\"></a></p>" % urlnext
-                verdict += "<p>of...</p><p>"
-            if urlagain: verdict += "<a href=\"%s\">Begin overnieuw</a><br>" % urlagain
-            if urlsame: verdict += "<a href=\"%s\">Zelfde bloemen nog eens</a><br>" % urlsame
-            if urlprev: verdict += "<a href=\"%s\">Makkelijkere bloemen</a><br>" % urlprev
-            verdict += "</p>"
-
+            verdict = self.tem_verdict.render(dict(alldone=itembankdone,urlnext=urlnext, urlagain=urlagain, urlprev=urlprev, urlsame=urlsame))
             answers = None
             key = Item()
             key.prompt = key.hint = key.attribution = key.license = ""
@@ -234,7 +232,7 @@ class Mchoice(object):
             while True:
                 safety += 1
                 if safety > 200:
-                    raise Exception("<p>Logic bug, this should never occur. Please inform motoom@xs4all.nl</p>")
+                    raise Exception(texts.logicbug)
                 rightone = random.randint(0, alternatives-1) # Appoint a random item.
                 candidatekey = options[rightone]
                 if candidatekey in learned: continue # If the item is already learned, select an other.
@@ -255,12 +253,11 @@ class Mchoice(object):
         # Choose a 'narrator' picture with his mood (negative, positive, neutral)
         feedback = bool(progress) or bool(message)
         if not message and not done:
-            # TODO: 'levelstart'-subtemplate
-            message = "<p>Welke bloem is dit?</p><p>Maak je keuze door &eacute;&eacute;n van<br>de mogelijkheden te kiezen.</p>"
+            message = self.tem_levelstart.render({})
             feedbackmood = 0
             feedback = True
-        feedbackpicture = "img/feedback%d.gif" % feedbackmood
-        promptpicture = "pictures/%s/%s" % (langcode, key.prompt)
+        feedbackpicture = os.path.join("img", "feedback%d.gif" % feedbackmood)
+        promptpicture = os.path.join("pictures", self.language, key.prompt)
 
         # License
         license = ""
@@ -268,19 +265,20 @@ class Mchoice(object):
             license = "<a target=\"_new\" href=\"http://wiki.creativecommons.org/Public_domain\">public domain</a>"
         elif key.license == "cc":
             license = "<a target=\"_new\" href=\"http://creativecommons.org/licenses/by-sa/3.0/deed.nl\">creative commons</a>"
-        vars = dict(answers=answers, weetje=key.hint, attribution=key.attribution, license=license, langcode=langcode, prompt=promptpicture, feedback=feedback, feedbackpicture=feedbackpicture, progress=progress, message=message, verdict=verdict)
+        vars = dict(answers=answers, weetje=key.hint, attribution=key.attribution, license=license, language=self.language, prompt=promptpicture, feedback=feedback, feedbackpicture=feedbackpicture, progress=progress, message=message, verdict=verdict)
         return self.tem_site.render(vars)
 
 
     # A list of all flowers, grouped by item bank.
     @cherrypy.expose
     def showall(self):
-        s = "<a href=\"/\">naar Quiz</a>"
+        s = "<a href=\"/\">%s</a>" % texts.toquiz
         for itembankname, itembank, _, _ in itembankdb.itembanks:
             s += "<h2>%s</h2><table>\n" % itembankname
             for nr, (key, pronoun, prompt, hint, attribution, license) in enumerate(itembank):
                 s += "<tr>"
-                acell = "<img src=\"pictures/%s/%s\">" % (langcode, key)
+                src = os.path.join("pictures", self.language, key)
+                acell = "<img src=\"%s\">" % src
                 bcell = "<h3>%d. %s</h3><p>%s</p><p><small>%s (%s)</small></p>" % (nr, prompt, hint, attribution, license)
                 if nr & 1:
                     acell, bcell = bcell, acell
@@ -295,26 +293,51 @@ class Mchoice(object):
     # TODO: Show the name with jQuery when user clicks/hover on it!
     @cherrypy.expose
     def showallwithout(self):
-        s = "<a href=\"/\">naar Quiz</a>"
+        s = "<a href=\"/\">%s</a>" % texts.toquiz
         for itembankname, itembank, _, _ in itembankdb.itembanks:
             for nr, (key, pronoun, prompt, hint, attribution, license) in enumerate(itembank):
                 s += "<tr>"
-                acell = "<img src=\"pictures/%s/%s\"><br><p><small>%s (%s)</small></p>" % (langcode, key, attribution, license)
+                src = os.path.join("pictures", self.language, key)
+                acell = "<img src=\"%s\"><br><p><small>%s (%s)</small></p>" % (src, attribution, license)
                 s += "<td align=\"right\" valign=\"top\">%s</td>\n" % acell
                 s += "<td valign=\"top\">TEST</td>\n"
                 s += "</tr>"
             s += "</table>\n"
         return s
 
+
+def importbyname(modname):
+    modf, modfn, moddesc = imp.find_module(modname, [os.path.join("templates", cherrypy.config["language"])])
+    mod = imp.load_module(modname, modf, modfn, moddesc)
+    modf.close()
+    return mod
+    
 # Main program.
-mchoice = Mchoice()
+# Determine the language from from the path on which this script runs.
+language = "nl" # Default dutch.
+path = os.path.abspath(inspect.getsourcefile(Mchoice))
+if "leer-de-bloemen.nl" in path: language = "en"
+if "learn-the-flowers.com" in path: language = "nl"
+cherrypy.log("Using language '%s'" % language, "ENGINE")
+cherrypy.config["language"] = language
+
 cfg = socket.gethostname()
 if "." in cfg: cfg = cfg.split(".")[0]
-cfg = os.path.join("cfg", cfg + ".cfg");
+cfg = os.path.join("cfg", cfg + "-" + language + ".cfg");
 cherrypy.log("Using configuration file '%s'" % cfg, "ENGINE")
 cherrypy.config.update(cfg)
+
+    
+# Import "templates/<language>/texts.py" which contains the translated strings.
+# Also import the itembank database, which is also language-dependent.
+texts = importbyname("texts")
+itembankdb = importbyname("itembankdb")
+
+# Instantiate and mount the app.
+mchoice = Mchoice()
 root = cherrypy.tree.mount(mchoice, "/", cfg)
 
+# Drop privileges, if user/group given.
 user, group = cherrypy.config.get("server.user"), cherrypy.config.get("server.group")
 dropargs = {}
 if user: dropargs["uid"] = user
@@ -323,8 +346,9 @@ if dropargs:
     cherrypy.process.plugins.DropPrivileges(cherrypy.engine, **dropargs).subscribe()
 
 if __name__ == "__main__":
-    cherrypy.engine.autoreload.files.add("site.tpl")
+    # Webapp started on the commandline.
+    autoreload.addautoreloaddir("templates", True)
     cherrypy.quickstart(root)
 else:
-    # Assume we run from cherryd
+    # Webapp started by cherryd
     pass
