@@ -316,8 +316,8 @@ def importbyname(modname):
 # Determine the language from from the path on which this script runs.
 language = "nl" # Default dutch.
 path = os.path.abspath(inspect.getsourcefile(Mchoice))
-if "leer-de-bloemen.nl" in path: language = "en"
-if "learn-the-flowers.com" in path: language = "nl"
+if "leer-de-bloemen.nl" in path: language = "nl"
+if "learn-the-flowers.com" in path: language = "en"
 cherrypy.log("Using language '%s'" % language, "ENGINE")
 cherrypy.config["language"] = language
 

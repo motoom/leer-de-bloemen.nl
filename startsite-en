@@ -1,0 +1,18 @@
+#!/bin/sh
+
+dir="."
+deamonize=""
+
+if [ -e /Users/user/Sites/learn-the-flowers.com ]; then
+    dir="/Users/user/Sites/learn-the-flowers.com"
+    echo "Running on OSX"
+fi
+
+if [ -e /www/learn-the-flowers.com ]; then
+    dir="/www/learn-the-flowers.com"
+    deamonize="-d"
+    echo "Running on BSD"
+fi
+
+cd $dir
+sudo cherryd $deamonize -P $dir -p /var/run/learn-the-flowers.com.pid -i mchoiceapp
