@@ -1,0 +1,218 @@
+
+/* site.css - Software by Michiel Overtoom, motoom@xs4all.nl */
+
+body {
+	height: 100%;
+	background-color: #fff;
+	font-family: Comic Sans MS, Papyrus, Verdana, helvetica;
+	}
+
+div#nav {
+	position: absolute;
+	top: 32px;
+	left: 8px;
+	color: black;
+	}
+
+div#content {
+	width: 400px;
+	margin-left: 50%;
+	margin-top: 32px;
+	min-height: 400px;
+	text-align: center;
+	}
+
+div#lucht {
+	background-color: #bae6ff;
+	color: #658a9f;
+	position: absolute;
+	top: 0px;
+	height: 85%;
+	width: 100%;
+	background-image: url('../img/foliage.gif');
+	background-repeat: no-repeat;
+	background-position: left bottom;
+	z-index: -2;
+	}
+
+div#grond {
+	background-color: #26b904;
+	color: #87f46e;
+	position: absolute;
+	bottom: 2px;
+	height: 15%;
+	width: 100%;
+	z-index: -2;
+	}
+
+div#twitter {
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	}
+
+.rounded {
+	-webkit-border-radius: 6px;
+	-moz-border-radius: 6px;
+	border-radius: 6px;
+	}
+
+p.next {
+	font-size: 200%;
+	color: #87f46e;
+	background-color: #26b904;
+	padding: 8px;
+	}
+
+p.bronvermelding {
+	text-align: center;
+	font-size: 80%;
+	position: absolute;
+	bottom: 8px;
+	width: 100%;
+	}
+
+a {
+	color: inherit;
+	}
+
+/* Navigatiemenu */
+
+ul.nav {
+	line-height: 150%;
+	}
+
+ul.nav a {
+	display: block;
+	text-decoration: none;
+	padding: 8px;
+	width: 300px;
+	-webkit-border-radius: 6px;
+	-moz-border-radius: 6px;
+	border-radius: 6px;
+	}
+
+ul.nav a:hover {
+	background-color: white;
+	}
+
+/* Multiple choice antwoorden */
+
+ul.mchoice {
+	line-height: 150%;
+	}
+
+ul.mchoice li {
+	display: block;
+	float: left;
+	width: 180px;
+	margin: 0px 4px 0px 4px;
+	}
+
+ul.mchoice a {
+	background-color: #D5F0FF;
+	display: block;
+	text-decoration: none;
+	margin: 4px 2px 4px 2px;
+	padding: 8px 0px 8px 0px;
+	width: 100%;
+	-webkit-border-radius: 6px;
+	-moz-border-radius: 6px;
+	border-radius: 6px;
+	}
+
+ul.mchoice a:hover {
+	background-color: #9EC6DD; /* #FFD800 Oranje */
+	}
+
+img {
+    border: none;
+    }
+
+.shadow {
+    margin: 4px;
+    -moz-box-shadow: 3px 3px 4px #7FAABF;
+    -webkit-box-shadow: 3px 3px 4px #7FAABF;
+    box-shadow: 3px 3px 4px #7FAABF;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Shadow(Strength=4, Direction=135, Color='#7FAABF')"; /* For IE 8 */
+    filter: progid:DXImageTransform.Microsoft.Shadow(Strength=4, Direction=135, Color='#7FAABF'); /* For IE 5.5 - 7 */
+    }
+
+.blackshadow {
+    margin: 4px;
+    -moz-box-shadow: 3px 3px 4px #333;
+    -webkit-box-shadow: 3px 3px 4px #333;
+    box-shadow: 3px 3px 4px #333;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Shadow(Strength=4, Direction=135, Color='#333')";
+    filter: progid:DXImageTransform.Microsoft.Shadow(Strength=4, Direction=135, Color='#333');
+    }
+
+h1 {
+	font-size: 200%;
+	margin-bottom: 16px;
+	}
+
+h2 {
+	font-size: 150%;
+	margin-bottom: 8px;
+	}
+
+.yes {
+        color: #157800;
+        }
+
+.no {
+        color: #900529;
+        }
+
+p {
+	line-height: 130%;
+	margin: 8px 0px 8px 0px;
+	}
+
+p.extrawit {
+	margin: 20px 0px 20px 0px;
+	}
+
+div.feedback {
+	width: 300px;
+	margin-top: 32px;
+	padding: 8px;
+	-webkit-border-radius: 6px;
+	-moz-border-radius: 6px;
+	border-radius: 6px;
+	text-align: center;
+	}
+
+div.progress {
+	display: inline-block;
+	margin-bottom: 16px;
+	}
+
+div.message {
+	margin-left: 8px;
+	}
+
+
+/* Progress bar */
+
+.meter-wrap {
+	position: relative;
+	}
+
+.meter-wrap, .meter-value, .meter-text {
+	width: 266px; height: 22px;
+	}
+
+.meter-wrap, .meter-value {
+	background: #bdbdbd url(../img/progressbar.png) top left no-repeat;
+	}
+
+.meter-text {
+	position: absolute;
+	top: 0;
+	left: 0;
+	padding-top: 2px;
+	text-align: center;
+	width: 100%;
+	}
