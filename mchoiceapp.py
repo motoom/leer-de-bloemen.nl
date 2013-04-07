@@ -5,8 +5,6 @@
 # Ideas/TODOs:
 #
 # - Rotating logfile.
-# - Templatize everything, translate all strings (en/nl template hierarchy).
-# - English version / internationalisation.
 # - Extra flowers (madelief, distel, etc...).
 # - Online highscore list, enter your name when you get a high score.
 # - Show high score rankings.
@@ -26,7 +24,7 @@ import logging
 import autoreload
 import imp
 import inspect
-
+import illustrators
 
 threshold = 2 # (3) The number of times the user has to answer an item correctly in a row before it's considered a known item. (suggestion: 3)
 tolearnsize = 7 # (10) Number of items currently being learned.
@@ -64,13 +62,18 @@ class Mchoice(object):
                 attribution.encode("ascii")
                 # And also check the licensing of the pictures, Creative Commons or Public Domain.
                 if license not in ("cc", "pd"): raise Exception("%s: license type must be 'cc' or 'pd'" % answer)
-
+        # TODO: Check if all illustrator image directories exist
 
     def loadtemplate(self, fn):
         return Ovotemplate().fromfile(os.path.join("templates", self.language, fn)) 
                
 
     def populatesession(self, difficulty=0):
+        # If a specific illustrator was chosen before, stick with it.
+        if cherrypy.session.get("items"):
+            _, _, _, _, _, _, _, _, _, illustratorslug, _ = cherrypy.session["items"]
+        else:
+            illustratorslug = illustrators.pick()
         itembankname, itembank, _, _ = itembankdb.itembanks[difficulty]
         tolearn = list(itembank) # Pool of items still to learn.
         learned = []  # Questions which have been answered 'threshold' times more correct than incorrect
@@ -78,8 +81,10 @@ class Mchoice(object):
         tickets = set() # Submit tickets seen (to prevent reloads from messing up the game)
         random.shuffle(tolearn)
         options = key = rightone = None
+        first = True
         done = False
-        cherrypy.session["items"] = difficulty, learning, learned, tolearn, options, key, rightone, done, tickets
+        # TODO: Put all this state into one object, and persist that. (state.learned, state.tolearn etc...)
+        cherrypy.session["items"] = difficulty, learning, learned, tolearn, options, key, rightone, done, tickets, illustratorslug, first
 
 
     def addtolearn(self, tolearn, tolearnsize, learning):
@@ -128,7 +133,16 @@ class Mchoice(object):
         visits = visits + 1
         cherrypy.session["visits"] = visits
 
-        difficulty, learning, learned, tolearn, options, key, rightone, done, tickets = cherrypy.session["items"]
+        difficulty, learning, learned, tolearn, options, key, rightone, done, tickets, illustratorslug, first = cherrypy.session["items"]
+
+        # Make it possible to visit the website and specify an illustrator
+        # like http://www.leer-de-bloemen.nl/?i=herman-roozen
+        slug = kwargs.get("i")
+        if slug is not None:
+            if illustrators.isvalid(slug):
+                illustratorslug = slug
+            else:
+                raise cherrypy.HTTPError(404)
 
         message = ""
         wascorrect = False
@@ -162,15 +176,18 @@ class Mchoice(object):
                 if done:
                     message = ""
                 else:
-                    message = self.tem_correct.render(dict(correct=self.randomcorrect(), language=self.language, prompt=key.prompt, pronoun=key.pronoun, correctanswer=correctanswer, known=known))
-
+                    smallerprompt = key.prompt.replace(".jpg", "s.jpg") # XXXX.jpg -> XXXXs.jpg
+                    message = self.tem_correct.render(dict(correct=self.randomcorrect(), language=self.language, prompt=smallerprompt, correctpronoun=key.pronoun, correctanswer=correctanswer, known=known))
+                first = False
             else:
                 key.incorrect += 1
                 key.correctrow = 0
                 wronganswer = options[answer].answer.lower()
                 correctanswer =  key.answer.lower()
-                message = self.tem_wrong.render(dict(wrong=self.randomwrong(), wronganswer=wronganswer, language=self.language, prompt=key.prompt, pronoun=key.pronoun, correctanswer=correctanswer))
-
+                smallerprompt = key.prompt.replace(".jpg", "s.jpg")
+                message = self.tem_wrong.render(dict(wrong=self.randomwrong(), wrongpronoun=options[answer].pronoun, wronganswer=wronganswer, language=self.language, prompt=smallerprompt, correctpronoun=key.pronoun, correctanswer=correctanswer))
+                first = False
+                
         # Calculate progress
         completed = len(learned)
         itembankname, itembank, itembankintro, itembankdone = itembankdb.itembanks[difficulty]
@@ -189,13 +206,14 @@ class Mchoice(object):
                 progress = texts.youknowthemall
 
         # Show narrator picture in which mood? -4 = angry, 0 = neutral, 4 = happy (and values in-between).
-        feedbackmood=0
-        if key and 0 < percent < 100:
+        feedbackmood = "0"
+        if key and not done:
             if wascorrect:
                 feedbackmood = clamp(percent/20, 1,4)
             else:
                 feedbackmood = clamp(key.correct - key.incorrect, -4, -1)
-
+            feedbackmood = str(int(feedbackmood))
+            
         if done:
             logmsg = "Level %d completed by %s" % (difficulty, cherrypy.request.remote.ip) # TODO: Also try to keep stats like how long it took, how many good/bad answers, etc.
             cherrypy.log(logmsg, "COMPLETE", logging.INFO)
@@ -248,26 +266,43 @@ class Mchoice(object):
                 answers.append(dict(answer=option.answer, url=url))
 
         # Persist the whole state back into the session.
-        cherrypy.session["items"] = difficulty, learning, learned, tolearn, options, key, rightone, done, tickets
+        cherrypy.session["items"] = difficulty, learning, learned, tolearn, options, key, rightone, done, tickets, illustratorslug, first
 
         # Choose a 'narrator' picture with his mood (negative, positive, neutral)
         feedback = bool(progress) or bool(message)
         if not message and not done:
             message = self.tem_levelstart.render({})
-            feedbackmood = 0
+            feedbackmood = "0"
             feedback = True
-        feedbackpicture = os.path.join("img", "feedback%d.gif" % feedbackmood)
+        # Special occasions: at the first question, and when all flowers are done.
+        if first: feedbackmood = "a"
+        if done: feedbackmood = "b"
+        
+        feedbackpicture = os.path.join("img", "feedback", illustratorslug, "%s.png" % feedbackmood)
         promptpicture = os.path.join("pictures", self.language, key.prompt)
 
-        # License
+        # Photo attribution and license.
         license = ""
         if key.license == "pd":
             license = "<a target=\"_new\" href=\"http://wiki.creativecommons.org/Public_domain\">public domain</a>"
         elif key.license == "cc":
             license = "<a target=\"_new\" href=\"http://creativecommons.org/licenses/by-sa/3.0/deed.nl\">creative commons</a>"
-        vars = dict(answers=answers, weetje=key.hint, attribution=key.attribution, license=license, language=self.language, prompt=promptpicture, feedback=feedback, feedbackpicture=feedbackpicture, progress=progress, message=message, verdict=verdict)
+
+        # Illustrator
+        illustratorname, illustratorurl = illustrators.name_and_url(illustratorslug)
+
+        # Finally, render the page.
+        vars = dict(answers=answers, weetje=key.hint, 
+                    attribution=key.attribution, license=license, 
+                    illustratorname=illustratorname, illustratorurl=illustratorurl,
+                    language=self.language, prompt=promptpicture, feedback=feedback, 
+                    feedbackpicture=feedbackpicture, progress=progress, message=message, verdict=verdict)
         return self.tem_site.render(vars)
 
+    # A (static) page describing the illustrators.
+    @cherrypy.expose
+    def illustrators(self):
+        raise cherrypy.HTTPRedirect(cherrypy.url("static/" + self.language + "/illustrators.html"))
 
     # A list of all flowers, grouped by item bank.
     @cherrypy.expose
@@ -313,11 +348,12 @@ def importbyname(modname):
     return mod
     
 # Main program.
-# Determine the language from from the path on which this script runs.
+# Determine the language from from the path on which this program runs.
 language = "nl" # Default dutch.
 path = os.path.abspath(inspect.getsourcefile(Mchoice))
 if "leer-de-bloemen.nl" in path: language = "nl"
 if "learn-the-flowers.com" in path: language = "en"
+# language = "en" # Force English...
 cherrypy.log("Using language '%s'" % language, "ENGINE")
 cherrypy.config["language"] = language
 
@@ -347,7 +383,7 @@ if dropargs:
 
 if __name__ == "__main__":
     # Webapp started on the commandline.
-    autoreload.addautoreloaddir("templates", True)
+    autoreload.addautoreloaddir("templates")
     cherrypy.quickstart(root)
 else:
     # Webapp started by cherryd

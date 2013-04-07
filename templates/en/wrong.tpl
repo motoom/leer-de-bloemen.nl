@@ -1,4 +1,4 @@
 <h2 class="no">{=wrong}</h2>
-<p>That's not {=wronganswer}.</p>
+<p>That wasn't {=wrongpronoun} {=wronganswer}.</p>
 <p><img class="blackshadow" src="pictures/{=language}/{=prompt}"></p>
-<p>This is {=pronoun} {=correctanswer}!</p>
+<p>This is {=correctpronoun} {=correctanswer}!</p>

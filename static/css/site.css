@@ -125,7 +125,7 @@ ul.mchoice a:hover {
 	background-color: #9EC6DD; /* #FFD800 Oranje */
 	}
 
-div img {
+img {
     border: none;
     }
 
@@ -191,11 +191,6 @@ div.progress {
 
 div.message {
 	margin-left: 8px;
-	}
-
-div.message img {
-	width: 33%;
-	height: 33%;
 	}
 
 

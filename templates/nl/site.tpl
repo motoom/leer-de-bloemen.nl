@@ -43,7 +43,7 @@
 		}
 		<div class="message">{=message}</div>
 	</div>
-	<p><img src="{=feedbackpicture}"></p>
+	<p><a href="illustrators" title="Wie is deze bloem?"><img src="{=feedbackpicture}"></a></p>
 	}
 </div>
 
@@ -56,7 +56,8 @@
 
 <div id="grond">
 <p class="bronvermelding">
-{?attribution Foto van bloem: {=attribution}, {=license}.<br />}
+{?attribution Foto: {=attribution}, {=license}.}
+{?illustratorname Illustraties: <a target="_new" href="{=illustratorurl}">{=illustratorname}</a>.<br />}
 Vormgeving en webprogrammering door <a target="_new" href="http://www.michielovertoom.com">Michiel Overtoom</a>.<br />
 Jouw <a href="mailto:motoom@xs4all.nl">mening</a> over deze site stel ik zeer op prijs.
 <!-- Lees de <a target="_new" href="privacyverklaring">Privacy-verklaring</a> -->

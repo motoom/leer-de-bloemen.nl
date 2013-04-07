@@ -4,11 +4,10 @@ import os
 
 convertimages = False
 
-
-# TODO: Ook opslaan welke bloemen wel of niet aangesproken moeten worden met 'een'.
-
+# De niveaus.
 levels = [["easy",[]], ["medium",[]], ["hard",[]]]
 
+# De items binnen elk niveau.
 levels[0][1] = (
     'Brandnetel', 'Boterbloem', 'Distel', 'Klaproos', 'Madeliefje', 'Narcis',
     'Paardenbloem', 'Sneeuwklokje', 'Tulp', 'Witte klaver', 'Zonnebloem'
@@ -30,6 +29,7 @@ levels[2][1] = (
     'Zevenblad', 'Zinkviooltje'
     )
 
+# Welke bloemen wel of niet aangesproken moeten worden met 'een'.
 articleless = (
     'Witte klaver',
     'Bieslook',
@@ -50,8 +50,8 @@ articleless = (
     'Vetkruid',
     'Zeepkruid',
     )
-    
-    
+
+
 def process(langcode, article):
     db = {}
     for nr, infile in enumerate(glob.glob(langcode + "/*.jpg")):
@@ -114,6 +114,6 @@ def process(langcode, article):
         for bloemtitel in bloemtitels:
             print db[bloemtitel]
         print ")\n"
-    
+
 process("nl", "een")
 process("en", "a")

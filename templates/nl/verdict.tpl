@@ -1,6 +1,6 @@
 {=alldone}
 {?urlnext
-    <p class="next shadow rounded"><a href="{=urlnext}">Ga verder <img src="img/arrow-forward.png"></a></p>
+    <p class="next shadow rounded"><a href="{=urlnext}">Ga verder <img src="img/pointing-hand-right.png"></a></p>
     <p>of...</p>
 }
 <p>

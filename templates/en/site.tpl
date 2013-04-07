@@ -43,7 +43,7 @@
 		}
 		<div class="message">{=message}</div>
 	</div>
-	<p><img src="{=feedbackpicture}"></p>
+	<p><a href="illustrators" title="Who's this flower?"><img src="{=feedbackpicture}"></a></p>
 	}
 </div>
 
@@ -56,7 +56,8 @@
 
 <div id="grond">
 <p class="bronvermelding">
-{?attribution Picture of flower: {=attribution}, {=license}.<br />}
+{?attribution Picture: {=attribution}, {=license}.}
+{?illustratorname Illustrations: <a target="_new" href="{=illustratorurl}">{=illustratorname}</a>.<br />}
 Design and webprogramming by <a target="_new" href="http://www.michielovertoom.com">Michiel Overtoom</a>.<br />
 I appreciate your <a href="mailto:motoom@xs4all.nl">feedback</a> on this site.
 <!-- Read the <a target="_new" href="privacyverklaring">Privacy statement</a> -->

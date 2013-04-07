@@ -85,7 +85,7 @@ hard = (
 itembanks = (
     ("Wellknown flowers",
         easy,
-        "<p>We start with some well known flowers, to get your feet wet!</p><p>It's OK when you guess a flower wrong, I'll just show you the right answer.</p><p>Go ahead!</p>",
+        "<p>We start with some well known flowers. After you make two correct guesses at a flower, I wont't ask it again.</p><p>It's OK when you guess a flower wrong, I'll just show you the right answer.</p><p>Go ahead!</p>",
         "<p>Well done, you now know all the easy flowers. Let's proceed to the somewhat lesser known flowers!</p>",
         ),
     ("Somewhat less known flowers",
@@ -99,3 +99,25 @@ itembanks = (
         "<p>That was all... You now know all the flowers on this website. Great job!</p>",
         ),
     )
+
+if __name__ == "__main__":
+    import sqlite3
+    # con = sqlite3.connect("/Users/user/Sites/learnthethings/things.db")
+    c = con.cursor()
+    c.row_factory = sqlite3.Row
+    # for r in c.execute("select * from learnthethings_level"): print r["id"], r["title"]
+    # id 1 Wellknown flowers
+    # id 2 Somewhat less known flowers
+    # id 3 Hard-to-guess flowers
+    for level, itembank in ((1, easy), (2, medium), (3, hard)):
+        c.execute("delete from learnthethings_item where level_id=?", (level,))
+        print "Level", level
+        for (image, article, name, hint, attribution, license) in itembank:
+            image = image.replace(".jpg", "")
+            print image, name
+            c.execute("""
+                insert into learnthethings_item(level_id, image, article, name, hint, attribution, license) 
+                values (?,?,?,?,?,?,?)
+                """, (level, image, article, name, hint, attribution, license))
+    con.commit()
+    
